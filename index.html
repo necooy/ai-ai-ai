@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>SACRAMENTO | Portal de Acólitos</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Special+Elite&display=swap');
+
+        :root {
+            --paper: #e6d5b8;
+            --ink: #1a1a1a;
+            --blood: #8b0000;
+            --stripe: rgba(0,0,0,0.08);
+        }
+
+        body { 
+            background: #121212; font-family: 'Special Elite', cursive; 
+            display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; 
+        }
+
+        /* --- SISTEMA DE LOGIN --- */
+        #auth-screen {
+            background: #1a1a1a; color: white; padding: 40px; border: 2px solid #444;
+            width: 350px; text-align: center; margin-top: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        .auth-input { width: 100%; padding: 10px; margin: 10px 0; background: #333; border: 1px solid #555; color: white; font-family: inherit; }
+        .auth-btn { width: 100%; padding: 12px; background: var(--blood); color: white; border: none; cursor: pointer; font-family: inherit; text-transform: uppercase; margin-top: 10px; }
+        .auth-link { font-size: 0.8em; color: #aaa; cursor: pointer; display: block; margin-top: 15px; }
+
+        /* --- PAINEL DE CONTROLE (PÓS-LOGIN) --- */
+        #user-panel {
+            background: #222; color: white; padding: 15px; border-radius: 8px;
+            margin-bottom: 20px; display: none; gap: 15px; align-items: center; border: 1px solid #444;
+        }
+
+        /* --- ESTÉTICA DA FICHA --- */
+        .sheet {
+            background-color: var(--paper);
+            background-image: url("https://www.transparenttextures.com/patterns/paper-fibers.png");
+            width: 210mm; min-height: 297mm; padding: 45px; box-sizing: border-box;
+            border: 8px double var(--ink); display: none; box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            position: relative;
+        }
+
+        .header { text-align: center; border-bottom: 4px solid var(--ink); margin-bottom: 30px; }
+        .header h1 { margin: 0; font-size: 3.2em; letter-spacing: 8px; }
+
+        .section-title { 
+            background: var(--ink); color: var(--paper); padding: 8px 15px; 
+            text-transform: uppercase; letter-spacing: 3px; margin: 20px 0 10px 0; font-weight: bold;
+        }
+
+        .grid-main { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 30px; }
+
+        .circle { 
+            width: 28px; height: 28px; border: 3px solid var(--ink); border-radius: 50%;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .circle.filled { background: var(--ink); }
+        .circle.filled::after { content: '✕'; color: var(--paper); font-size: 18px; }
+
+        .pain-item { display: flex; align-items: center; gap: 15px; padding: 5px; }
+        .pain-item:nth-child(even) { background: var(--stripe); }
+        .pain-desc { font-size: 0.75em; line-height: 1.2; }
+
+        .attr-box { border: 2px solid var(--ink); padding: 10px; text-align: center; }
+        .attr-val { font-size: 2em; font-weight: bold; display: block; }
+
+        textarea { width: 100%; min-height: 200px; border: 2px solid var(--ink); background: transparent; padding: 15px; font-family: inherit; outline: none; resize: none; }
+
+        #wizard { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 999; display: none; align-items: center; justify-content: center; color: white; }
+        .wiz-card { background: #1a1a1a; padding: 40px; border: 2px solid #555; width: 450px; }
+
+        @media print { #user-panel, #auth-screen, .auth-btn { display: none !important; } body { background: white; } .sheet { display: block !important; box-shadow: none; } }
+    </style>
+</head>
+<body>
+
+<div id="auth-screen">
+    <h2 id="auth-title">Login de Acólito</h2>
+    <input type="text" id="auth-user" class="auth-input" placeholder="Usuário">
+    <input type="password" id="auth-pass" class="auth-input" placeholder="Senha">
+    <button class="auth-btn" onclick="handleAuth()" id="btn-auth">Entrar</button>
+    <span class="auth-link" onclick="toggleAuthMode()" id="auth-toggle">Não tem conta? Crie uma aqui.</span>
+</div>
+
+<div id="user-panel">
+    <span>👤 <b id="display-user"></b></span>
+    <button class="auth-btn" style="margin:0; padding:5px 10px; font-size:0.7em;" onclick="openWizard()">+ Nova Ficha</button>
+    <select id="ficha-selector" class="auth-input" style="margin:0; width:150px;" onchange="loadFicha(this.value)">
+        <option value="">Minhas Fichas</option>
+    </select>
+    <button class="auth-btn" style="margin:0; padding:5px 10px; font-size:0.7em; background:#444;" onclick="saveCurrentFicha()">Salvar</button>
+    <button class="auth-btn" style="margin:0; padding:5px 10px; font-size:0.7em; background:#333;" onclick="logout()">Sair</button>
+</div>
+
+<div id="wizard">
+    <div class="wiz-card">
+        <h2 id="w-title">Nova Jornada</h2>
+        <div id="w-body">
+            <input type="text" id="in-name" placeholder="Nome do Personagem" class="auth-input">
+        </div>
+        <button class="auth-btn" onclick="nextStep()" id="w-next">Avançar</button>
+    </div>
+</div>
+
+<div class="sheet" id="sheet">
+    <div class="header">
+        <h1>SACRAMENTO</h1>
+        <div style="font-size: 1.6em; margin-top: 10px;">PERSONAGEM: <span id="out-name"></span></div>
+    </div>
+
+    <div class="grid-main">
+        <div>
+            <div class="section-title">Atributos</div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                <div class="attr-box"><span class="attr-val" id="out-fisico">0</span>FIS</div>
+                <div class="attr-box"><span class="attr-val" id="out-velocidade">0</span>VEL</div>
+                <div class="attr-box"><span class="attr-val" id="out-intelecto">0</span>INT</div>
+                <div class="attr-box"><span class="attr-val" id="out-coragem">0</span>COR</div>
+            </div>
+            <div class="section-title">Círculos de Dor</div>
+            <div class="pain-list" id="dor-container">
+                <div class="pain-item"><div class="circle" data-idx="0"></div><div class="pain-desc"><b>Atordoado</b> (-1 Ação)</div></div>
+                <div class="pain-item"><div class="circle" data-idx="1"></div><div class="pain-desc"><b>Queda</b> (Gasta Mov)</div></div>
+                <div class="pain-item"><div class="circle" data-idx="2"></div><div class="pain-desc"><b>Distração</b> (Mudar Alvo)</div></div>
+                <div class="pain-item"><div class="circle" data-idx="3"></div><div class="pain-desc"><b>Sangramento</b> (+1 Dor)</div></div>
+                <div class="pain-item"><div class="circle" data-idx="4"></div><div class="pain-desc"><b>Intimidação</b> (Recuar)</div></div>
+                <div class="pain-item"><div class="circle" data-idx="5"></div><div class="pain-desc"><b>Desorientado</b> (-1 Viol)</div></div>
+            </div>
+        </div>
+        <div>
+            <div class="section-title">Vitalidade</div>
+            <div id="vida-row" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+            <div class="section-title">Antecedentes</div>
+            <div id="ant-display" style="font-size: 0.9em; line-height: 1.6;"></div>
+            <div class="section-title">Combate</div>
+            <div style="display: flex; gap: 10px; text-align: center;">
+                <div class="attr-box" style="flex:1;">Ações: <b id="out-acoes">1</b></div>
+                <div class="attr-box" style="flex:1;">Passos: <b id="out-mov">1</b></div>
+            </div>
+        </div>
+    </div>
+    <div class="section-title">Redenção & Notas</div>
+    <textarea id="lore-text" placeholder="Sua história começa aqui..."></textarea>
+</div>
+
+<script>
+    let currentUser = null;
+    let isRegisterMode = false;
+    let char = { name: "", attr: { fisico: 0, velocidade: 0, intelecto: 0, coragem: 0 }, step: 1, ant: {} };
+    const ants = ["ATENÇÃO", "ROUBO", "MEDICINA", "SUOR", "MONTARIA", "TRADIÇÃO", "NEGÓCIOS", "VIOLÊNCIA"];
+
+    // --- AUTH LOGIC ---
+    function toggleAuthMode() {
+        isRegisterMode = !isRegisterMode;
+        document.getElementById('auth-title').innerText = isRegisterMode ? "Criar Conta" : "Login de Acólito";
+        document.getElementById('btn-auth').innerText = isRegisterMode ? "Cadastrar" : "Entrar";
+        document.getElementById('auth-toggle').innerText = isRegisterMode ? "Já tem conta? Entre aqui." : "Não tem conta? Crie uma aqui.";
+    }
+
+    function handleAuth() {
+        const u = document.getElementById('auth-user').value;
+        const p = document.getElementById('auth-pass').value;
+        if(!u || !p) return alert("Preencha tudo!");
+
+        let users = JSON.parse(localStorage.getItem('sac_users') || "{}");
+
+        if(isRegisterMode) {
+            if(users[u]) return alert("Usuário já existe!");
+            users[u] = { pass: p, fichas: {} };
+            localStorage.setItem('sac_users', JSON.stringify(users));
+            alert("Conta criada! Agora faça login.");
+            toggleAuthMode();
+        } else {
+            if(users[u] && users[u].pass === p) {
+                currentUser = u;
+                loginSuccess();
+            } else {
+                alert("Usuário ou senha incorretos.");
+            }
+        }
+    }
+
+    function loginSuccess() {
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('user-panel').style.display = 'flex';
+        document.getElementById('display-user').innerText = currentUser;
+        updateFichaSelector();
+    }
+
+    function logout() { location.reload(); }
+
+    // --- FICHA STORAGE ---
+    function saveCurrentFicha() {
+        if(!currentUser) return;
+        let users = JSON.parse(localStorage.getItem('sac_users'));
+        const fichaData = {
+            char: char,
+            lore: document.getElementById('lore-text').value,
+            dor: Array.from(document.querySelectorAll('#dor-container .circle')).map(c => c.classList.contains('filled')),
+            vida: Array.from(document.querySelectorAll('#vida-row .circle')).map(c => c.classList.contains('filled'))
+        };
+        users[currentUser].fichas[char.name] = fichaData;
+        localStorage.setItem('sac_users', JSON.stringify(users));
+        updateFichaSelector();
+        alert("Ficha '" + char.name + "' salva com sucesso!");
+    }
+
+    function updateFichaSelector() {
+        const sel = document.getElementById('ficha-selector');
+        sel.innerHTML = '<option value="">Minhas Fichas</option>';
+        let users = JSON.parse(localStorage.getItem('sac_users'));
+        Object.keys(users[currentUser].fichas).forEach(name => {
+            sel.innerHTML += `<option value="${name}">${name}</option>`;
+        });
+    }
+
+    function loadFicha(name) {
+        if(!name) return;
+        let users = JSON.parse(localStorage.getItem('sac_users'));
+        const data = users[currentUser].fichas[name];
+        char = data.char;
+        finalize();
+        document.getElementById('lore-text').value = data.lore;
+        const dorC = document.querySelectorAll('#dor-container .circle');
+        data.dor.forEach((f, i) => { if(f) dorC[i].classList.add('filled'); });
+        const vidaC = document.querySelectorAll('#vida-row .circle');
+        data.vida.forEach((f, i) => { if(f) vidaC[i].classList.add('filled'); });
+    }
+
+    // --- FICHA LOGIC ---
+    function openWizard() { document.getElementById('wizard').style.display = 'flex'; char.step = 1; }
+
+    function nextStep() {
+        if(char.step === 1) {
+            char.name = document.getElementById('in-name').value || "Sem Nome";
+            char.step = 2; showAttrWiz();
+        } else if(char.step === 2) {
+            char.step = 3; showAntWiz();
+        } else { finalize(); }
+    }
+
+    function showAttrWiz() {
+        document.getElementById('w-title').innerText = "Atributos (4 pts)";
+        let b = document.getElementById('w-body'); b.innerHTML = "";
+        for(let a in char.attr) {
+            b.innerHTML += `<div style="display:flex; justify-content:space-between; margin:10px 0;"><span>${a}</span><span><button onclick="modA('${a}',-1)">-</button> <b id="wa-${a}">0</b> <button onclick="modA('${a}',1)">+</button></span></div>`;
+        }
+    }
+
+    function modA(a, v) {
+        let cur = Object.values(char.attr).reduce((x,y)=>x+y,0);
+        if(v > 0 && cur < 4) char.attr[a]++;
+        else if(v < 0 && char.attr[a] > 0) char.attr[a]--;
+        document.getElementById('wa-'+a).innerText = char.attr[a];
+    }
+
+    function showAntWiz() {
+        let lim = 4 + char.attr.intelecto;
+        document.getElementById('w-title').innerText = `Antecedentes (${lim} pts)`;
+        let b = document.getElementById('w-body'); b.innerHTML = "";
+        ants.forEach(a => {
+            char.ant[a] = 0;
+            b.innerHTML += `<div style="display:flex; justify-content:space-between; margin:8px 0;"><span>${a}</span><span><button onclick="modAn('${a}',-1)">-</button> <b id="wan-${a}">0</b> <button onclick="modAn('${a}',1)">+</button></span></div>`;
+        });
+    }
+
+    function modAn(a, v) {
+        let used = Object.values(char.ant).reduce((x,y)=>x+y,0);
+        let lim = 4 + char.attr.intelecto;
+        if(v > 0 && used < lim && char.ant[a] < 2) char.ant[a]++;
+        else if(v < 0 && char.ant[a] > 0) char.ant[a]--;
+        document.getElementById('wan-'+a).innerText = char.ant[a];
+    }
+
+    function handleProgressive(container) {
+        container.addEventListener('click', (e) => {
+            if(e.target.classList.contains('circle')) {
+                const circles = Array.from(container.querySelectorAll('.circle'));
+                const idx = circles.indexOf(e.target);
+                if(e.target.classList.contains('filled') && (idx === circles.length - 1 || !circles[idx + 1].classList.contains('filled'))) {
+                    circles.forEach((c, i) => { if(i >= idx) c.classList.remove('filled'); });
+                } else {
+                    circles.forEach((c, i) => { if(i <= idx) c.classList.add('filled'); else c.classList.remove('filled'); });
+                }
+            }
+        });
+    }
+
+    function finalize() {
+        document.getElementById('wizard').style.display = 'none';
+        document.getElementById('sheet').style.display = 'block';
+        document.getElementById('out-name').innerText = char.name;
+        for(let a in char.attr) document.getElementById('out-'+a).innerText = char.attr[a];
+        document.getElementById('out-mov').innerText = 1 + char.attr.velocidade;
+        document.getElementById('out-acoes').innerText = 1 + char.attr.coragem;
+        let aList = document.getElementById('ant-display'); aList.innerHTML = "";
+        ants.forEach(a => { if(char.ant[a] > 0) aList.innerHTML += `<div><b>${a}:</b> 1d6 + ${char.ant[a]}</div>`; });
+        const vR = document.getElementById('vida-row'); vR.innerHTML = "";
+        for(let i=0; i<(6 + char.attr.fisico); i++) { vR.innerHTML += '<div class="circle"></div>'; }
+        handleProgressive(document.getElementById('dor-container'));
+        handleProgressive(vR);
+    }
+</script>
+</body>
+</html>

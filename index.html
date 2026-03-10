@@ -18,16 +18,41 @@
             display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; 
         }
 
+        /* --- TOOLTIP STYLE --- */
+        .info-tip {
+            position: relative;
+            cursor: help;
+            border-bottom: 1px dotted var(--blood);
+        }
+
+        .info-tip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a1a1a;
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.7em;
+            width: 200px;
+            z-index: 1000;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
         /* --- SISTEMA DE LOGIN --- */
         #auth-screen {
             background: #1a1a1a; color: white; padding: 40px; border: 2px solid #444;
             width: 350px; text-align: center; margin-top: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
         }
-        .auth-input { width: 100%; padding: 10px; margin: 10px 0; background: #333; border: 1px solid #555; color: white; font-family: inherit; }
+        .auth-input { width: 100%; padding: 10px; margin: 10px 0; background: #333; border: 1px solid #555; color: white; font-family: inherit; box-sizing: border-box; }
         .auth-btn { width: 100%; padding: 12px; background: var(--blood); color: white; border: none; cursor: pointer; font-family: inherit; text-transform: uppercase; margin-top: 10px; }
+        .auth-btn:disabled { background: #444; cursor: not-allowed; color: #888; }
         .auth-link { font-size: 0.8em; color: #aaa; cursor: pointer; display: block; margin-top: 15px; }
 
-        /* --- PAINEL DE CONTROLE (PÓS-LOGIN) --- */
+        /* --- PAINEL DE CONTROLE --- */
         #user-panel {
             background: #222; color: white; padding: 15px; border-radius: 8px;
             margin-bottom: 20px; display: none; gap: 15px; align-items: center; border: 1px solid #444;
@@ -68,8 +93,8 @@
 
         textarea { width: 100%; min-height: 200px; border: 2px solid var(--ink); background: transparent; padding: 15px; font-family: inherit; outline: none; resize: none; }
 
-        #wizard { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 999; display: none; align-items: center; justify-content: center; color: white; }
-        .wiz-card { background: #1a1a1a; padding: 40px; border: 2px solid #555; width: 450px; }
+        #wizard { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 999; display: none; align-items: center; justify-content: center; color: white; overflow-y: auto;}
+        .wiz-card { background: #1a1a1a; padding: 40px; border: 2px solid #555; width: 450px; margin: 20px;}
 
         @media print { #user-panel, #auth-screen, .auth-btn { display: none !important; } body { background: white; } .sheet { display: block !important; box-shadow: none; } }
     </style>
@@ -114,10 +139,10 @@
         <div>
             <div class="section-title">Atributos</div>
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-                <div class="attr-box"><span class="attr-val" id="out-fisico">0</span>FIS</div>
-                <div class="attr-box"><span class="attr-val" id="out-velocidade">0</span>VEL</div>
-                <div class="attr-box"><span class="attr-val" id="out-intelecto">0</span>INT</div>
-                <div class="attr-box"><span class="attr-val" id="out-coragem">0</span>COR</div>
+                <div class="attr-box info-tip" data-tooltip="FÍSICO: Resistência e força. Aumenta Vitalidade."><span class="attr-val" id="out-fisico">0</span>FIS</div>
+                <div class="attr-box info-tip" data-tooltip="VELOCIDADE: Agilidade e reflexos. Aumenta Passos."><span class="attr-val" id="out-velocidade">0</span>VEL</div>
+                <div class="attr-box info-tip" data-tooltip="INTELECTO: Conhecimento. Aumenta Antecedentes."><span class="attr-val" id="out-intelecto">0</span>INT</div>
+                <div class="attr-box info-tip" data-tooltip="CORAGEM: Força de vontade. Aumenta Ações."><span class="attr-val" id="out-coragem">0</span>COR</div>
             </div>
             <div class="section-title">Círculos de Dor</div>
             <div class="pain-list" id="dor-container">
@@ -149,9 +174,26 @@
     let currentUser = null;
     let isRegisterMode = false;
     let char = { name: "", attr: { fisico: 0, velocidade: 0, intelecto: 0, coragem: 0 }, step: 1, ant: {} };
-    const ants = ["ATENÇÃO", "ROUBO", "MEDICINA", "SUOR", "MONTARIA", "TRADIÇÃO", "NEGÓCIOS", "VIOLÊNCIA"];
+    
+    const antsData = {
+        "ATENÇÃO": "Perceber detalhes ocultos.",
+        "ROUBO": "Agilidade manual e furtividade.",
+        "MEDICINA": "Tratar ferimentos e venenos.",
+        "SUOR": "Esforço físico e resistência.",
+        "MONTARIA": "Controlar animais e veículos.",
+        "TRADIÇÃO": "Lendas e o sagrado.",
+        "NEGÓCIOS": "Trocas e diplomacia.",
+        "VIOLÊNCIA": "Combate ofensivo."
+    };
+    const antsKeys = Object.keys(antsData);
 
-    // --- AUTH LOGIC ---
+    const attrDesc = {
+        "fisico": "Resistência e vida.",
+        "velocidade": "Esquiva e movimento.",
+        "intelecto": "Mente e perícias extras.",
+        "coragem": "Determinação e ações."
+    };
+
     function toggleAuthMode() {
         isRegisterMode = !isRegisterMode;
         document.getElementById('auth-title').innerText = isRegisterMode ? "Criar Conta" : "Login de Acólito";
@@ -163,22 +205,18 @@
         const u = document.getElementById('auth-user').value;
         const p = document.getElementById('auth-pass').value;
         if(!u || !p) return alert("Preencha tudo!");
-
         let users = JSON.parse(localStorage.getItem('sac_users') || "{}");
-
         if(isRegisterMode) {
             if(users[u]) return alert("Usuário já existe!");
             users[u] = { pass: p, fichas: {} };
             localStorage.setItem('sac_users', JSON.stringify(users));
-            alert("Conta criada! Agora faça login.");
+            alert("Conta criada!");
             toggleAuthMode();
         } else {
             if(users[u] && users[u].pass === p) {
                 currentUser = u;
                 loginSuccess();
-            } else {
-                alert("Usuário ou senha incorretos.");
-            }
+            } else { alert("Incorreto."); }
         }
     }
 
@@ -191,22 +229,6 @@
 
     function logout() { location.reload(); }
 
-    // --- FICHA STORAGE ---
-    function saveCurrentFicha() {
-        if(!currentUser) return;
-        let users = JSON.parse(localStorage.getItem('sac_users'));
-        const fichaData = {
-            char: char,
-            lore: document.getElementById('lore-text').value,
-            dor: Array.from(document.querySelectorAll('#dor-container .circle')).map(c => c.classList.contains('filled')),
-            vida: Array.from(document.querySelectorAll('#vida-row .circle')).map(c => c.classList.contains('filled'))
-        };
-        users[currentUser].fichas[char.name] = fichaData;
-        localStorage.setItem('sac_users', JSON.stringify(users));
-        updateFichaSelector();
-        alert("Ficha '" + char.name + "' salva com sucesso!");
-    }
-
     function updateFichaSelector() {
         const sel = document.getElementById('ficha-selector');
         sel.innerHTML = '<option value="">Minhas Fichas</option>';
@@ -214,6 +236,21 @@
         Object.keys(users[currentUser].fichas).forEach(name => {
             sel.innerHTML += `<option value="${name}">${name}</option>`;
         });
+    }
+
+    function saveCurrentFicha() {
+        if(!currentUser) return;
+        let users = JSON.parse(localStorage.getItem('sac_users'));
+        const fichaData = {
+            char: JSON.parse(JSON.stringify(char)),
+            lore: document.getElementById('lore-text').value,
+            dor: Array.from(document.querySelectorAll('#dor-container .circle')).map(c => c.classList.contains('filled')),
+            vida: Array.from(document.querySelectorAll('#vida-row .circle')).map(c => c.classList.contains('filled'))
+        };
+        users[currentUser].fichas[char.name] = fichaData;
+        localStorage.setItem('sac_users', JSON.stringify(users));
+        updateFichaSelector();
+        alert("Salvo!");
     }
 
     function loadFicha(name) {
@@ -224,13 +261,28 @@
         finalize();
         document.getElementById('lore-text').value = data.lore;
         const dorC = document.querySelectorAll('#dor-container .circle');
-        data.dor.forEach((f, i) => { if(f) dorC[i].classList.add('filled'); });
+        data.dor.forEach((f, i) => { if(f) dorC[i].classList.add('filled'); else dorC[i].classList.remove('filled'); });
         const vidaC = document.querySelectorAll('#vida-row .circle');
-        data.vida.forEach((f, i) => { if(f) vidaC[i].classList.add('filled'); });
+        data.vida.forEach((f, i) => { if(f) vidaC[i].classList.add('filled'); else vidaC[i].classList.remove('filled'); });
     }
 
-    // --- FICHA LOGIC ---
-    function openWizard() { document.getElementById('wizard').style.display = 'flex'; char.step = 1; }
+    function openWizard() { 
+        document.getElementById('wizard').style.display = 'flex'; 
+        char = { name: "", attr: { fisico: 0, velocidade: 0, intelecto: 0, coragem: 0 }, step: 1, ant: {} };
+        showNameWiz();
+    }
+
+    function updateWizButton(enabled, label = "Avançar") {
+        const btn = document.getElementById('w-next');
+        btn.disabled = !enabled;
+        btn.innerText = enabled ? label : "Distribua os Pontos";
+    }
+
+    function showNameWiz() {
+        document.getElementById('w-title').innerText = "Nova Jornada";
+        document.getElementById('w-body').innerHTML = '<input type="text" id="in-name" placeholder="Nome do Personagem" class="auth-input">';
+        updateWizButton(true);
+    }
 
     function nextStep() {
         if(char.step === 1) {
@@ -245,8 +297,14 @@
         document.getElementById('w-title').innerText = "Atributos (4 pts)";
         let b = document.getElementById('w-body'); b.innerHTML = "";
         for(let a in char.attr) {
-            b.innerHTML += `<div style="display:flex; justify-content:space-between; margin:10px 0;"><span>${a}</span><span><button onclick="modA('${a}',-1)">-</button> <b id="wa-${a}">0</b> <button onclick="modA('${a}',1)">+</button></span></div>`;
+            b.innerHTML += `<div style="margin:10px 0; border-bottom:1px solid #444; padding-bottom:5px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <b style="text-transform:uppercase;">${a}</b>
+                    <span><button onclick="modA('${a}',-1)">-</button> <b id="wa-${a}">${char.attr[a]}</b> <button onclick="modA('${a}',1)">+</button></span>
+                </div>
+            </div>`;
         }
+        checkAttrPoints();
     }
 
     function modA(a, v) {
@@ -254,16 +312,28 @@
         if(v > 0 && cur < 4) char.attr[a]++;
         else if(v < 0 && char.attr[a] > 0) char.attr[a]--;
         document.getElementById('wa-'+a).innerText = char.attr[a];
+        checkAttrPoints();
+    }
+
+    function checkAttrPoints() {
+        let cur = Object.values(char.attr).reduce((x,y)=>x+y,0);
+        updateWizButton(cur === 4);
     }
 
     function showAntWiz() {
         let lim = 4 + char.attr.intelecto;
         document.getElementById('w-title').innerText = `Antecedentes (${lim} pts)`;
         let b = document.getElementById('w-body'); b.innerHTML = "";
-        ants.forEach(a => {
-            char.ant[a] = 0;
-            b.innerHTML += `<div style="display:flex; justify-content:space-between; margin:8px 0;"><span>${a}</span><span><button onclick="modAn('${a}',-1)">-</button> <b id="wan-${a}">0</b> <button onclick="modAn('${a}',1)">+</button></span></div>`;
+        antsKeys.forEach(a => {
+            char.ant[a] = char.ant[a] || 0;
+            b.innerHTML += `<div style="margin:8px 0; border-bottom:1px solid #444; padding-bottom:5px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <b>${a}</b>
+                    <span><button onclick="modAn('${a}',-1)">-</button> <b id="wan-${a}">${char.ant[a]}</b> <button onclick="modAn('${a}',1)">+</button></span>
+                </div>
+            </div>`;
         });
+        checkAntPoints();
     }
 
     function modAn(a, v) {
@@ -272,20 +342,33 @@
         if(v > 0 && used < lim && char.ant[a] < 2) char.ant[a]++;
         else if(v < 0 && char.ant[a] > 0) char.ant[a]--;
         document.getElementById('wan-'+a).innerText = char.ant[a];
+        checkAntPoints();
     }
 
-    function handleProgressive(container) {
-        container.addEventListener('click', (e) => {
+    function checkAntPoints() {
+        let used = Object.values(char.ant).reduce((x,y)=>x+y,0);
+        let lim = 4 + char.attr.intelecto;
+        updateWizButton(used === lim, "Finalizar");
+    }
+
+    function setupCircles() {
+        // Círculos de Dor: Individuais
+        document.querySelectorAll('#dor-container .circle').forEach(c => {
+            c.onclick = () => c.classList.toggle('filled');
+        });
+        // Vitalidade: Progressiva
+        const vR = document.getElementById('vida-row');
+        vR.onclick = (e) => {
             if(e.target.classList.contains('circle')) {
-                const circles = Array.from(container.querySelectorAll('.circle'));
+                const circles = Array.from(vR.querySelectorAll('.circle'));
                 const idx = circles.indexOf(e.target);
-                if(e.target.classList.contains('filled') && (idx === circles.length - 1 || !circles[idx + 1].classList.contains('filled'))) {
+                if(e.target.classList.contains('filled') && (idx === circles.length-1 || !circles[idx+1].classList.contains('filled'))) {
                     circles.forEach((c, i) => { if(i >= idx) c.classList.remove('filled'); });
                 } else {
                     circles.forEach((c, i) => { if(i <= idx) c.classList.add('filled'); else c.classList.remove('filled'); });
                 }
             }
-        });
+        };
     }
 
     function finalize() {
@@ -295,12 +378,18 @@
         for(let a in char.attr) document.getElementById('out-'+a).innerText = char.attr[a];
         document.getElementById('out-mov').innerText = 1 + char.attr.velocidade;
         document.getElementById('out-acoes').innerText = 1 + char.attr.coragem;
-        let aList = document.getElementById('ant-display'); aList.innerHTML = "";
-        ants.forEach(a => { if(char.ant[a] > 0) aList.innerHTML += `<div><b>${a}:</b> 1d6 + ${char.ant[a]}</div>`; });
+        
+        let aList = document.getElementById('ant-display'); 
+        aList.innerHTML = "";
+        antsKeys.forEach(a => {
+            let val = char.ant[a] || 0;
+            aList.innerHTML += `<div class="info-tip" data-tooltip="${antsData[a]}" style="opacity:${val>0?1:0.4}"><b>${a}:</b> 1d6+${val}</div>`;
+        });
+
         const vR = document.getElementById('vida-row'); vR.innerHTML = "";
-        for(let i=0; i<(6 + char.attr.fisico); i++) { vR.innerHTML += '<div class="circle"></div>'; }
-        handleProgressive(document.getElementById('dor-container'));
-        handleProgressive(vR);
+        for(let i=0; i<(6+char.attr.fisico); i++) vR.innerHTML += '<div class="circle"></div>';
+        
+        setupCircles();
     }
 </script>
 </body>
